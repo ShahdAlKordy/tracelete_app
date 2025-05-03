@@ -1,0 +1,38 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "tracelet-app",
+          "appId": "1:345436780940:android:3285034e9cd167416dfea9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "tracelet-app",
+          "configurations": {
+            "android": "1:345436780940:android:3285034e9cd167416dfea9",
+            "ios": "1:345436780940:ios:8730f41a4c41cb826dfea9",
+            "macos": "1:345436780940:ios:8730f41a4c41cb826dfea9",
+            "web": "1:345436780940:web:0490935c98bb35436dfea9",
+            "windows": "1:345436780940:web:abf157c674038d566dfea9"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}

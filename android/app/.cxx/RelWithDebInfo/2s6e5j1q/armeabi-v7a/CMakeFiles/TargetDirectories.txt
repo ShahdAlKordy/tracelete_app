@@ -1,0 +1,2 @@
+D:/tracelet project/tracelet_app/android/app/.cxx/RelWithDebInfo/2s6e5j1q/armeabi-v7a/CMakeFiles/edit_cache.dir
+D:/tracelet project/tracelet_app/android/app/.cxx/RelWithDebInfo/2s6e5j1q/armeabi-v7a/CMakeFiles/rebuild_cache.dir

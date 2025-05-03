@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "345436780940",
+    "project_id": "tracelet-app",
+    "storage_bucket": "tracelet-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:345436780940:android:3285034e9cd167416dfea9",
+        "android_client_info": {
+          "package_name": "com.example.tracelet_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBf7oinnidr0pcI0AB2034WmRqSYXTMeNk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
