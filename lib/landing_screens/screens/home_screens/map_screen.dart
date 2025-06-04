@@ -1,231 +1,300 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:tracelet_app/constans/constans.dart';
-import 'dart:async';
-
-// ملاحظة: لا تستورد NavigationBar أو NavigationController هنا
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:math' as math;
 
 class GoogleMapScreen extends StatefulWidget {
-  const GoogleMapScreen({Key? key}) : super(key: key);
-
   @override
-  State<GoogleMapScreen> createState() => _GoogleMapScreenState();
+  _BraceletLocationScreenState createState() => _BraceletLocationScreenState();
 }
 
-class _GoogleMapScreenState extends State<GoogleMapScreen> {
-  // Initial map controller
+class _BraceletLocationScreenState extends State<GoogleMapScreen> {
+  final DatabaseReference dbRef = FirebaseDatabase.instance.ref();
+  LatLng? braceletLocation;
+  bool isConnected = false;
+  bool isLoading = true;
   GoogleMapController? mapController;
+  String? braceletId;
 
-  // Default center position for the map (will be updated from database)
-  LatLng _centerPosition = const LatLng(30.0444, 31.2357); // Cairo as default
+  // Safe Zone as Polygon
+  List<LatLng> safeZonePoints = [];
+  Polygon? safeZonePolygon;
+  bool isOutsideSafeZone = false;
 
-  // Set of markers to be displayed on the map
-  final Set<Marker> _markers = {};
-
-  // Reference to the database - use "location" as path
-  final DatabaseReference _locationRef =
-      FirebaseDatabase.instance.ref('location');
-
-  // StreamSubscription for database updates
-  late StreamSubscription<DatabaseEvent> _locationSubscription;
-
-  // Tracks if we're currently loading data
-  bool _isLoading = true;
+  // Notifications
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
     super.initState();
-    // Start listening to database updates
-    _subscribeToLocationUpdates();
+    _initializeNotifications();
+    _loadStoredBraceletId();
+    _initFCM();
   }
 
-  @override
-  void dispose() {
-    // Cancel the subscription when the widget is disposed
-    _locationSubscription.cancel();
-    mapController?.dispose();
-    super.dispose();
+  Future<void> _initializeNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
-  void _subscribeToLocationUpdates() {
-    _locationSubscription = _locationRef.onValue.listen((DatabaseEvent event) {
-      final data = event.snapshot.value;
+  Future<void> _initFCM() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    String? fcmToken = await messaging.getToken();
+    print("FCM Token: $fcmToken");
 
+    if (braceletId != null && fcmToken != null) {
+      await dbRef.child("bracelets/$braceletId/user_info/fcm_token").set(fcmToken);
+    }
+  }
+
+  Future<void> _loadStoredBraceletId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedBraceletId = prefs.getString('bracelet_id');
+    if (savedBraceletId != null) {
       setState(() {
-        _isLoading = false;
-        _markers.clear();
+        braceletId = savedBraceletId;
+      });
+      _checkConnectionAndLoadLocation();
+      _loadSafeZone();
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
-        if (data != null) {
-          // Handle data directly as the "location" node
-          if (data is Map) {
-            try {
-              // Extract lat and lng values
-              double lat = double.parse(data['lat'].toString());
-              double lng = double.parse(data['lng'].toString());
+  Future<void> _loadSafeZone() async {
+    if (braceletId == null) return;
 
-              // Create a new position
-              LatLng position = LatLng(lat, lng);
-              _centerPosition = position;
+    try {
+      final safeZoneSnapshot = await dbRef
+          .child("bracelets/$braceletId/safe_zone_polygon")
+          .get();
 
-              // Add marker for this location
-              _markers.add(
-                Marker(
-                  markerId: const MarkerId('device_location'),
-                  position: position,
-                  infoWindow: const InfoWindow(
-                    title: 'Current Location',
-                    snippet: 'Device is here',
-                  ),
-                ),
-              );
-
-              // Update camera position
-              _updateCameraPosition();
-
-              print('Location data found: Lat: $lat, Lng: $lng');
-            } catch (e) {
-              print('Error parsing location data: $e');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error parsing location: $e')),
-              );
+      if (safeZoneSnapshot.exists) {
+        final data = safeZoneSnapshot.value as Map;
+        List<LatLng> points = [];
+        
+        // Load up to 4 points
+        for (int i = 0; i < 4; i++) {
+          if (data.containsKey('point$i')) {
+            Map pointData = data['point$i'] as Map;
+            double? lat = double.tryParse(pointData['lat'].toString());
+            double? lng = double.tryParse(pointData['lng'].toString());
+            
+            if (lat != null && lng != null) {
+              points.add(LatLng(lat, lng));
             }
-          } else {
-            print('Unexpected data format: $data');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Invalid location data format')),
-            );
           }
-        } else {
-          print('No data found at location node');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No location data found')),
-          );
         }
-      });
-    }, onError: (error) {
-      setState(() {
-        _isLoading = false;
-      });
-      print('Database error: $error');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Database error: ${error.toString()}')),
-      );
+
+        if (points.length >= 3) {
+          setState(() {
+            safeZonePoints = points;
+            _updatePolygon();
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading safe zone: $e');
+    }
+  }
+
+  void _updatePolygon() {
+    if (safeZonePoints.length < 3) {
+      safeZonePolygon = null;
+      return;
+    }
+    
+    safeZonePolygon = Polygon(
+      polygonId: PolygonId('safeZone'),
+      points: List.from(safeZonePoints),
+      fillColor: Colors.green.withOpacity(0.2),
+      strokeColor: Colors.green,
+      strokeWidth: 2,
+    );
+  }
+
+  Future<void> _checkConnectionAndLoadLocation() async {
+    if (braceletId == null) return;
+
+    try {
+      final connectedSnapshot = await dbRef
+          .child("bracelets/$braceletId/user_info/connected")
+          .get();
+
+      if (connectedSnapshot.exists && connectedSnapshot.value == true) {
+        setState(() {
+          isConnected = true;
+        });
+
+        final locationSnapshot = await dbRef
+            .child("bracelets/$braceletId/location")
+            .get();
+
+        if (locationSnapshot.exists) {
+          final data = locationSnapshot.value as Map;
+          final lat = double.tryParse(data['lat'].toString());
+          final lng = double.tryParse(data['lng'].toString());
+
+          if (lat != null && lng != null) {
+            setState(() {
+              braceletLocation = LatLng(lat, lng);
+
+              // Check if the bracelet is inside the safe zone
+              if (safeZonePoints.length >= 3 && braceletLocation != null) {
+                isOutsideSafeZone = !_isPointInPolygon(braceletLocation!, safeZonePoints);
+                
+                dbRef
+                    .child("bracelets/$braceletId/alerts/out_of_zone")
+                    .set(isOutsideSafeZone);
+
+                if (isOutsideSafeZone) {
+                  _showOutOfZoneNotification();
+                }
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+    }
+
+    setState(() {
+      isLoading = false;
     });
   }
 
-  void _updateCameraPosition() {
-    if (mapController != null) {
-      mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: _centerPosition,
-            zoom: 14.0,
-          ),
-        ),
-      );
+  // Check if a point is inside a polygon using the ray casting algorithm
+  bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
+    // Ray casting algorithm
+    bool isInside = false;
+    int j = polygon.length - 1;
+    
+    for (int i = 0; i < polygon.length; i++) {
+      if ((polygon[i].longitude < point.longitude && polygon[j].longitude >= point.longitude ||
+          polygon[j].longitude < point.longitude && polygon[i].longitude >= point.longitude) &&
+          (polygon[i].latitude + (point.longitude - polygon[i].longitude) / 
+          (polygon[j].longitude - polygon[i].longitude) * 
+          (polygon[j].latitude - polygon[i].latitude) < point.latitude)) {
+        isInside = !isInside;
+      }
+      j = i;
     }
+    
+    return isInside;
+  }
+
+  Future<void> _showOutOfZoneNotification() async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'safe_zone_channel',
+      'Safe Zone Alerts',
+      importance: Importance.max,
+      priority: Priority.high,
+      ticker: 'ticker',
+    );
+
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      '⚠️ Alert',
+      'Bracelet has exited the safe zone!',
+      platformChannelSpecifics,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      // تمنع استخدام زر الرجوع في الجهاز
-      onWillPop: () async => false,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Location Tracker',
-            style: TextStyle(
-              color: Colors.white,
-            ),
-          ),
-          backgroundColor: AppColors.primaryColor,
-          // منع زر الرجوع في الـ AppBar
-          automaticallyImplyLeading: false,
-        ),
-        body: Stack(
-          children: [
-            GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _centerPosition,
-                zoom: 14.0,
-              ),
-              markers: _markers,
-              onMapCreated: (GoogleMapController controller) {
-                mapController = controller;
-                // Update camera position when map is created if we already have data
-                if (_markers.isNotEmpty) {
-                  _updateCameraPosition();
-                }
-              },
-              zoomControlsEnabled: true,
-              mapType: MapType.normal,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: false,
-            ),
-            if (_isLoading)
-              Container(
-                color: Colors.black26,
-                child: const Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-          ],
-        ),
-        floatingActionButton: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            FloatingActionButton(
-              heroTag: "btn1",
-              onPressed: () {
-                if (_markers.isNotEmpty) {
-                  _updateCameraPosition();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No location available')),
-                  );
-                }
-              },
-              child: const Icon(Icons.my_location),
-            ),
-            const SizedBox(height: 16),
-            FloatingActionButton(
-              heroTag: "btn2",
-              onPressed: () {
-                // Refresh data from database
-                setState(() {
-                  _isLoading = true;
-                });
-                _locationRef.get().then((snapshot) {
-                  if (snapshot.exists) {
-                    // Data will be processed through the stream listener
-                    print('Database snapshot exists: ${snapshot.value}');
-                  } else {
-                    setState(() {
-                      _isLoading = false;
-                    });
-                    print('No location data found in database');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('No location data found')),
-                    );
-                  }
-                }).catchError((error) {
-                  setState(() {
-                    _isLoading = false;
-                  });
-                  print('Error fetching location: $error');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: ${error.toString()}')),
-                  );
-                });
-              },
-              child: const Icon(Icons.refresh),
-            ),
-          ],
-        ),
-        // لا تضيف شريط التنقل هنا أبداً - سيتم إضافته فقط من NavigationController
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Bracelet Location"),
+        backgroundColor: Color(0xff243561),
       ),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : !isConnected
+              ? Center(
+                  child: Text(
+                    'No bracelet connected currently ⚠️',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                )
+              : Stack(
+                  children: [
+                    braceletLocation != null
+                        ? GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: braceletLocation!,
+                              zoom: 16,
+                            ),
+                            markers: {
+                              Marker(
+                                markerId: MarkerId('bracelet'),
+                                position: braceletLocation!,
+                                infoWindow: InfoWindow(title: "Bracelet Location"),
+                              ),
+                              ...safeZonePoints.asMap().entries.map((entry) {
+                                int idx = entry.key;
+                                LatLng point = entry.value;
+                                return Marker(
+                                  markerId: MarkerId("safe_point_$idx"),
+                                  position: point,
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                                      BitmapDescriptor.hueGreen),
+                                  infoWindow: InfoWindow(title: "Safe Zone Point ${idx+1}"),
+                                );
+                              }).toList(),
+                            },
+                            polygons: safeZonePolygon != null
+                                ? {safeZonePolygon!}
+                                : {},
+                            onMapCreated: (controller) {
+                              mapController = controller;
+                            },
+                          )
+                        : Center(
+                            child: Text(
+                              'Bracelet location not available yet',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                    if (isOutsideSafeZone && braceletLocation != null)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        right: 10,
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            "⚠️ Alert: Bracelet is outside the safe zone!",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
     );
   }
 }

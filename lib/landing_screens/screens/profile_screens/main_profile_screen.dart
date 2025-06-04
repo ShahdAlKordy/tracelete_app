@@ -10,7 +10,7 @@ import 'package:tracelet_app/auth_screens/Log_In_Screen.dart';
 import 'package:tracelet_app/constans/constans.dart';
 import 'package:tracelet_app/controllers/navigation_controller.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/account_screen.dart';
-import 'package:tracelet_app/landing_screens/screens/profile_screens/language_screen.dart';
+import 'package:tracelet_app/landing_screens/screens/profile_screens/SafeZoneScreen_screen.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/notifications_screen.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_landing_widget.dart';
 import 'package:tracelet_app/landing_screens/navigation_bar/navigationBar.dart';
@@ -382,9 +382,9 @@ class _MainProfileScreenState extends State<MainProfileScreen> {
               onTap: () => Get.to(() => const AccountScreen()),
             ),
             _buildOptionItem(
-              icon: Icons.language,
-              text: 'Language',
-              onTap: () => Get.to(() => const LanguageScreen()),
+              icon: Icons.safety_check,
+              text: 'SafeZone',
+              onTap: () => Get.to(() =>  SafeZoneScreen()),
             ),
             _buildOptionItem(
               icon: Icons.notifications,
