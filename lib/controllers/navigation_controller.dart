@@ -7,7 +7,6 @@ import 'package:tracelet_app/landing_screens/navigation_bar/navigationBar.dart';
 
 class NavigationController extends StatefulWidget {
   final int initialIndex;
-
   const NavigationController({super.key, this.initialIndex = 0});
 
   @override
@@ -17,10 +16,9 @@ class NavigationController extends StatefulWidget {
 class _NavigationControllerState extends State<NavigationController> {
   late int currentIndex;
 
-  // تأكد من أن الشاشات التي يتم استخدامها تُدمج داخل هذا الكونترولر
   final List<Widget> screens = [
-    GoogleMapScreen(), // استخدم هذه الشاشة دون أن تحتوي على شريط تنقل خاص بها
-    ChatLogo(), 
+    GoogleMapScreen(), 
+    ChatLogo(),
     BraceletsScreen(),
     MainProfileScreen(),
   ];
@@ -44,7 +42,7 @@ class _NavigationControllerState extends State<NavigationController> {
       onWillPop: () async => false,
       child: Scaffold(
         // لا تحتاج إلى AppBar هنا إذا كانت كل شاشة تحتوي على AppBar خاص بها
-        body: screens[currentIndex], 
+        body: screens[currentIndex],
         bottomNavigationBar: CustomBottomNavBar(
           currentIndex: currentIndex,
           onItemTapped: navigateTo,

@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:tracelet_app/constans/constans.dart';
 import 'package:tracelet_app/controllers/navigation_controller.dart';
 import 'package:tracelet_app/landing_screens/navigation_bar/navigationBar.dart';
+import 'package:tracelet_app/landing_screens/screens/profile_screens/ProfilePictureWidget.dart';
 import 'package:tracelet_app/widgets/EditFieldDialog.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_landing_widget.dart';
 
@@ -60,72 +61,6 @@ class _AccountScreenState extends State<AccountScreen> {
       }
     } catch (e) {
       print("Error fetching user data: $e");
-    }
-  }
-
-  Future<void> _pickAndUploadImage() async {
-    try {
-      // طلب الإذن لاستخدام المعرض (لأندرويد وأحدث الإصدارات)
-      var status = await Permission.photos.request();
-      if (status.isDenied || status.isPermanentlyDenied) {
-        print("❌ لم يتم منح الإذن للوصول إلى الصور");
-        return;
-      }
-
-      // فتح المعرض لاختيار صورة
-      final XFile? pickedFile =
-          await _picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile == null) {
-        print("❌ لم يتم اختيار أي صورة");
-        return;
-      }
-
-      User? user = _auth.currentUser;
-      if (user == null) {
-        print("❌ لا يوجد مستخدم مسجل الدخول");
-        return;
-      }
-
-      File imageFile = File(pickedFile.path);
-
-      // تحديث الصورة في الواجهة فورًا قبل الرفع
-      setState(() {
-        profileImageUrl = pickedFile.path;
-      });
-
-      print("✅ الصورة المختارة: ${pickedFile.path}");
-
-      // رفع الصورة إلى Firebase Storage
-      Reference storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images/${user.uid}.jpg');
-
-      UploadTask uploadTask = storageRef.putFile(imageFile);
-
-      // الاستماع إلى حالة الرفع
-      uploadTask.snapshotEvents.listen((event) {
-        print("⏳ جاري الرفع: ${event.bytesTransferred} / ${event.totalBytes}");
-      });
-
-      await uploadTask.whenComplete(() => print("✅ تم رفع الصورة بنجاح!"));
-
-      // جلب الرابط بعد الرفع
-      String downloadUrl = await storageRef.getDownloadURL();
-      print("📌 رابط الصورة الجديدة: $downloadUrl");
-
-      // تحديث Firestore
-      await _firestore.collection('users').doc(user.uid).update({
-        'profileImage': downloadUrl,
-      });
-
-      // تحديث الصورة في الواجهة بعد الرفع
-      setState(() {
-        profileImageUrl = downloadUrl;
-      });
-
-      print("✅ تم تحديث صورة البروفايل في Firestore بنجاح!");
-    } catch (e) {
-      print("❌ خطأ أثناء تحديث صورة البروفايل: $e");
     }
   }
 
@@ -180,13 +115,20 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
               ),
               SizedBox(height: screenHeight * 0.11),
+
+              // Replace CircleAvatar with ProfilePictureWidget
               Center(
-                child: CircleAvatar(
-                  radius: screenWidth * 0.16,
-                  backgroundImage: const AssetImage(
-                      'assets/images/landing/bracelet icon.png'),
+                child: ProfilePictureWidget(
+                  size: screenWidth * 0.32,
+                  onImageChanged: () {
+                    // Refresh UI when image changes
+                    setState(() {});
+                  },
+                  showEditIcon: true,
+                  defaultImagePath: 'assets/images/landing/bracelet icon.png',
                 ),
               ),
+
               SizedBox(height: screenHeight * 0.01),
               Center(
                 child: Text(
@@ -275,7 +217,6 @@ class _AccountScreenState extends State<AccountScreen> {
             ],
           ),
         ),
-        
       ),
     );
   }

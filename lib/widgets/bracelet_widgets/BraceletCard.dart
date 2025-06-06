@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tracelet_app/widgets/bracelet_widgets/BraceletModel.dart';
+import 'package:tracelet_app/widgets/bracelet_widgets/ChildImageWidget.dart';
 
 class BraceletCard extends StatelessWidget {
   final BraceletModel bracelet;
@@ -46,7 +47,7 @@ class BraceletCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        SizedBox(width: 4),
+                        SizedBox(width: 1),
                         GestureDetector(
                           onTap: onEdit,
                           child: Icon(
@@ -92,10 +93,10 @@ class BraceletCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 8),
-                  Image.asset(
-                    'assets/images/landing/bracelet icon.png',
-                    width: imageSize.clamp(40, 60),
-                    height: imageSize.clamp(40, 60),
+                  // استخدام الـ widget الجديد لصورة الطفل
+                  ChildImageWidget(
+                    braceletId: bracelet.id ?? bracelet.name, // استخدم ID الـ bracelet أو الاسم كمعرف فريد
+                    size: imageSize.clamp(40, 60),
                   ),
                 ],
               ),

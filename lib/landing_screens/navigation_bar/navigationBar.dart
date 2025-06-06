@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:tracelet_app/constans/constans.dart';
 
+import 'package:flutter/material.dart';
+import 'package:tracelet_app/constans/constans.dart';
+
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onItemTapped;
@@ -13,31 +16,65 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onItemTapped, 
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: AppColors.primaryColor,
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Colors.grey[400],
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart),
-          label: 'Activity',
+    return Container(
+      margin: EdgeInsets.only(bottom: 1, left: 2, right: 2),
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.primaryColor,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(0, Icons.bar_chart, 'Activity'),
+          _buildNavItem(1, Icons.smart_toy, 'AI'),
+          _buildNavItem(2, Icons.watch, 'Bracelet'),
+          _buildNavItem(3, Icons.person, 'Profile'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    bool isSelected = currentIndex == index;
+
+    return GestureDetector(
+      onTap: () => onItemTapped(index),
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color:
+              isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.smart_toy),
-          label: 'AI',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : Colors.grey[400],
+              size: 24,
+            ),
+            SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[400],
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.watch),
-          label: 'Bracelet',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'Profile',
-        ),
-      ],
+      ),
     );
   }
 }

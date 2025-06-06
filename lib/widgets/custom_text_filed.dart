@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tracelet_app/constans/constans.dart';
 
 class CustomTextField extends StatelessWidget {
-  final TextEditingController? controller; // ✅ إضافة Controller
+  final TextEditingController? controller; // ✅ Add Controller
   final Function(String)? onChanged;
   final String label;
   final String hintText;
@@ -11,7 +11,7 @@ class CustomTextField extends StatelessWidget {
 
   const CustomTextField({
     super.key,
-    this.controller, // ✅ تمرير Controller
+    this.controller, // ✅ Pass Controller
     required this.label,
     required this.hintText,
     required this.icon,
@@ -32,7 +32,7 @@ class CustomTextField extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           TextField(
-            controller: controller, // ✅ استخدام Controller هنا
+            controller: controller, // ✅ Use Controller here
             onChanged: onChanged,
             obscureText: obscureText,
             decoration: InputDecoration(

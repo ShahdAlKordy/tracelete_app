@@ -6,11 +6,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:tracelet_app/controllers/email_verification_controller.dart';
-import 'package:tracelet_app/splash_screen/splash_screen.dart';  // عدّل المسار حسب موقع الملف
+import 'package:tracelet_app/splash_screen/splash_screen.dart';
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("رسالة في الخلفية: ${message.notification?.title}");
+  print("Background message: ${message.notification?.title}");
 }
 
 void main() async {
@@ -18,7 +18,6 @@ void main() async {
 
   await Firebase.initializeApp();
 
-  // تسجيل المعالج الخاص بالرسائل في الخلفية
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   runApp(
@@ -38,7 +37,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      home: SplashScreen(),  
+      home: SplashScreen(),
     );
   }
 }
