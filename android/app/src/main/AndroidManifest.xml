@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Required Permissions -->
+    <!-- Required Permissions for Notifications -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     
+    <!-- Permissions specifically for push notifications and background tasks -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/> <!-- For Android 13+ -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/> <!-- To receive notifications after device reboot -->
+    <uses-permission android:name="android.permission.VIBRATE"/> <!-- For notification vibration -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/> <!-- For high-priority notifications (e.g., critical alerts) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" /> <!-- For exact timed notifications if needed -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/> <!-- To keep the CPU awake for background tasks -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" /> <!-- If your app uses foreground services for background processing -->
+
+
     <!-- Storage support for older devices (less than Android 10) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
@@ -29,10 +39,17 @@
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
 
+        <!-- Meta-data for Google Maps API Key -->
         <meta-data 
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBzZRaB0KHS2P4g3efFBKYTLGO8gFsSvhk"/>
 
+        <!-- Default notification channel for Firebase Messaging -->
+        <!-- This is a fallback/default if specific channels aren't provided in FCM payload -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="high_importance_channel" />
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -64,6 +81,16 @@
         <meta-data
             android:name="io.flutter.embedding.android.RenderingBackend"
             android:value="skia" />
+
+        <!-- Firebase Cloud Messaging Service declaration -->
+        <!-- This service handles incoming FCM messages -->
+        <service
+            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 
     <!-- Support for selecting images from gallery -->

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tracelet_app/auth_screens/Email_Verification.dart';
-import 'package:tracelet_app/auth_service/mail_service.dart';
+import 'package:tracelet_app/services/mail_service.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_auth_widget.dart';
 import 'package:tracelet_app/widgets/custom_buttom.dart';
 import 'package:tracelet_app/widgets/custom_text_filed.dart';

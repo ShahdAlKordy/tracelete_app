@@ -33,12 +33,12 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
     _loadSavedImage();
   }
 
-  // تحميل الصورة المحفوظة محلياً
+  // Load saved image locally
   Future<void> _loadSavedImage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedPath = prefs.getString('profile_image_path');
-      
+
       if (savedPath != null && File(savedPath).existsSync()) {
         setState(() {
           _localImagePath = savedPath;
@@ -49,7 +49,7 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
     }
   }
 
-  // حفظ مسار الصورة محلياً
+  // Save image path locally
   Future<void> _saveImagePath(String path) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -59,10 +59,10 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
     }
   }
 
-  // اختيار وحفظ الصورة محلياً
+  // Choose and save image locally
   Future<void> _pickAndSaveImage() async {
     if (_isLoading) {
-      _showSnackBar("جاري التحميل، يرجى الانتظار...");
+      _showSnackBar("Loading, please wait...");
       return;
     }
 
@@ -71,17 +71,17 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
         _isLoading = true;
       });
 
-      // طلب إذن الوصول للصور
+      // Request permission to access photos
       final status = await Permission.photos.request();
       if (status.isDenied || status.isPermanentlyDenied) {
-        _showSnackBar("تم رفض إذن الوصول للصور");
+        _showSnackBar("Photo access permission denied");
         setState(() {
           _isLoading = false;
         });
         return;
       }
 
-      // اختيار الصورة من المعرض
+      // Choose image from gallery
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
@@ -94,31 +94,30 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
         return;
       }
 
-      // حفظ مسار الصورة محلياً
+      // Save image path locally
       await _saveImagePath(pickedFile.path);
-      
+
       setState(() {
         _localImagePath = pickedFile.path;
         _isLoading = false;
       });
 
-      // استدعاء callback إذا كان موجود
+      // Call callback if exists
       if (widget.onImageChanged != null) {
         widget.onImageChanged!();
       }
 
-      _showSnackBar("تم تحديث الصورة الشخصية بنجاح");
-
+      _showSnackBar("Profile picture updated successfully");
     } catch (e) {
       print("Error picking image: $e");
-      _showSnackBar("فشل في تحديث الصورة: ${e.toString()}");
+      _showSnackBar("Failed to update image: ${e.toString()}");
       setState(() {
         _isLoading = false;
       });
     }
   }
 
-  // عرض رسالة
+  // Show snackbar
   void _showSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,12 +126,12 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
     }
   }
 
-  // حذف الصورة والعودة للصورة الافتراضية
+  // Remove image and return to default image
   Future<void> _removeImage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('profile_image_path');
-      
+
       setState(() {
         _localImagePath = null;
       });
@@ -141,13 +140,13 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
         widget.onImageChanged!();
       }
 
-      _showSnackBar("تم حذف الصورة الشخصية");
+      _showSnackBar("Profile picture removed");
     } catch (e) {
       print("Error removing image: $e");
     }
   }
 
-  // عرض خيارات الصورة
+  // Show image options
   void _showImageOptions() {
     showModalBottomSheet(
       context: context,
@@ -161,7 +160,7 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('اختيار من المعرض'),
+              title: const Text('Choose from gallery'),
               onTap: () {
                 Navigator.pop(context);
                 _pickAndSaveImage();
@@ -170,7 +169,8 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
             if (_localImagePath != null)
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('حذف الصورة', style: TextStyle(color: Colors.red)),
+                title: const Text('Remove image',
+                    style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(context);
                   _removeImage();
@@ -178,7 +178,7 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
               ),
             ListTile(
               leading: const Icon(Icons.cancel),
-              title: const Text('إلغاء'),
+              title: const Text('Cancel'),
               onTap: () => Navigator.pop(context),
             ),
           ],
@@ -192,7 +192,7 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
     return Stack(
       alignment: Alignment.bottomRight,
       children: [
-        // الصورة الشخصية
+        // Profile picture
         Container(
           width: widget.size,
           height: widget.size,
@@ -211,8 +211,8 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
               ? const Center(child: CircularProgressIndicator())
               : ClipOval(child: _buildProfileImage()),
         ),
-        
-        // أيقونة التعديل
+
+        // Edit icon
         if (widget.showEditIcon)
           Positioned(
             bottom: 0,
@@ -254,10 +254,10 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
     );
   }
 
-  // بناء ويدجت الصورة
+  // Build profile image widget
   Widget _buildProfileImage() {
     if (_localImagePath != null && File(_localImagePath!).existsSync()) {
-      // عرض الصورة المحفوظة محلياً
+      // Show saved image locally
       return Image.file(
         File(_localImagePath!),
         width: widget.size,
@@ -269,12 +269,12 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
         },
       );
     } else {
-      // عرض الصورة الافتراضية
+      // Show default image
       return _buildDefaultImage();
     }
   }
 
-  // بناء الصورة الافتراضية
+  // Build default image
   Widget _buildDefaultImage() {
     return Image.asset(
       widget.defaultImagePath,
@@ -299,9 +299,10 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
     );
   }
 
-  // دالة للحصول على مسار الصورة الحالية
+  // Get current image path
   String? get currentImagePath => _localImagePath;
-  
-  // دالة للتحقق من وجود صورة مخصصة
-  bool get hasCustomImage => _localImagePath != null && File(_localImagePath!).existsSync();
+
+  // Check if custom image exists
+  bool get hasCustomImage =>
+      _localImagePath != null && File(_localImagePath!).existsSync();
 }

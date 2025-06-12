@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tracelet_app/auth_screens/Reset_Password.dart';
-import 'package:tracelet_app/auth_service/otp_verification_service.dart';
+import 'package:tracelet_app/services/otp_verification_service.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_auth_widget.dart';
 import 'package:tracelet_app/widgets/custom_buttom.dart';
 import 'package:tracelet_app/widgets/otp_input.dart';

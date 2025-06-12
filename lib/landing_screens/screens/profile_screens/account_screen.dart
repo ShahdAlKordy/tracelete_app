@@ -118,14 +118,21 @@ class _AccountScreenState extends State<AccountScreen> {
 
               // Replace CircleAvatar with ProfilePictureWidget
               Center(
-                child: ProfilePictureWidget(
-                  size: screenWidth * 0.32,
-                  onImageChanged: () {
-                    // Refresh UI when image changes
-                    setState(() {});
-                  },
-                  showEditIcon: true,
-                  defaultImagePath: 'assets/images/landing/bracelet icon.png',
+                child: Container(
+                  child: Column(
+                    children: [
+                      SizedBox(height: screenHeight * 0.003),
+                      ProfilePictureWidget(
+                        size: screenWidth * 0.32,
+                        onImageChanged: () {
+                          setState(() {});
+                        },
+                        showEditIcon: true,
+                        defaultImagePath: 'assets/images/pro.png',
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                    ],
+                  ),
                 ),
               ),
 

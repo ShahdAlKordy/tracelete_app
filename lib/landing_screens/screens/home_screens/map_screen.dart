@@ -1,13 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:tracelet_app/services/noti_service/NotificationService.dart';
+import 'package:tracelet_app/landing_screens/screens/home_screens/ChildLocationMarker.dart';
 import 'package:tracelet_app/landing_screens/screens/home_screens/CustomTopSnackBar.dart';
+import 'package:tracelet_app/widgets/bracelet_widgets/BraceletModel.dart';
 import 'dart:math' as math;
-
-// استيراد الـ CustomTopSnackBar
 
 class GoogleMapScreen extends StatefulWidget {
   @override
@@ -16,71 +21,274 @@ class GoogleMapScreen extends StatefulWidget {
 
 class _BraceletLocationScreenState extends State<GoogleMapScreen> {
   final DatabaseReference dbRef = FirebaseDatabase.instance.ref();
-  LatLng? braceletLocation;
-  bool isConnected = false;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  final NotificationService _notificationService = NotificationService();
+
+  List<BraceletModel> _activeBracelets = [];
+  Map<String, LatLng> _braceletLocations = {};
+  Map<String, bool> _braceletConnections = {};
+  Map<String, bool> _braceletStationaryStatus = {};
+  Map<String, bool> _braceletOutsideSafeZone = {};
+  Map<String, bool> _braceletInRedZone = {};
+
   bool isLoading = true;
-  bool isStationary = false; // إضافة متغير للحالة الثابتة
   GoogleMapController? mapController;
-  String? braceletId;
 
-  // Safe Zone as Polygon
-  List<LatLng> safeZonePoints = [];
-  Polygon? safeZonePolygon;
-  bool isOutsideSafeZone = false;
+  Map<String, List<LatLng>> _safeZonePoints = {};
+  Map<String, List<LatLng>> _redZonePoints = {};
 
-  // Notifications
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  Map<String, StreamSubscription<DatabaseEvent>> _locationListeners = {};
+  Map<String, StreamSubscription<DatabaseEvent>> _connectionListeners = {};
+  Map<String, StreamSubscription<DatabaseEvent>> _stationaryListeners = {};
+
+  Map<String, Marker> _braceletMarkers = {};
 
   @override
   void initState() {
     super.initState();
-    _initializeNotifications();
-    _loadStoredBraceletId();
-    _initFCM();
+    _initializeApp();
   }
 
-  Future<void> _initializeNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+  Future<void> _initializeApp() async {
+    await _notificationService.initialize();
+    await _loadActiveBracelets();
+    await _initFCM();
 
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
+    if (_activeBracelets.isNotEmpty) {
+      await _setupAllBracelets();
+    }
 
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  Future<void> _loadActiveBracelets() async {
+    final User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      final QuerySnapshot braceletsSnapshot = await _firestore
+          .collection("users")
+          .doc(currentUser.uid)
+          .collection("bracelets")
+          .where("is_active", isEqualTo: true)
+          .get();
+
+      final List<BraceletModel> loadedBracelets =
+          braceletsSnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return BraceletModel(
+          id: data['bracelet_id'] ?? doc.id,
+          name: data['name'] ?? 'Bracelet ${doc.id}',
+        );
+      }).toList();
+
+      setState(() {
+        _activeBracelets = loadedBracelets;
+      });
+    } catch (e) {
+      print("Error loading bracelets: $e");
+    }
   }
 
   Future<void> _initFCM() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
     String? fcmToken = await messaging.getToken();
-    print("FCM Token: $fcmToken");
 
-    if (braceletId != null && fcmToken != null) {
-      await dbRef
-          .child("bracelets/$braceletId/user_info/fcm_token")
-          .set(fcmToken);
+    if (fcmToken != null) {
+      for (BraceletModel bracelet in _activeBracelets) {
+        await dbRef
+            .child("bracelets/${bracelet.id}/user_info/fcm_token")
+            .set(fcmToken);
+      }
     }
   }
 
-  Future<void> _loadStoredBraceletId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedBraceletId = prefs.getString('bracelet_id');
-    if (savedBraceletId != null) {
+  Future<void> _setupAllBracelets() async {
+    for (BraceletModel bracelet in _activeBracelets) {
+      _setupBraceletListeners(bracelet.id);
+      await _loadBraceletZones(bracelet.id);
+      await _checkBraceletConnectionAndLoadLocation(bracelet.id);
+    }
+  }
+
+  void _setupBraceletListeners(String braceletId) {
+    _locationListeners[braceletId] =
+        dbRef.child("bracelets/$braceletId/location").onValue.listen((event) {
+      if (event.snapshot.exists) {
+        final data = event.snapshot.value as Map;
+        final lat = double.tryParse(data['lat'].toString());
+        final lng = double.tryParse(data['lng'].toString());
+
+        if (lat != null && lng != null) {
+          setState(() {
+            _braceletLocations[braceletId] = LatLng(lat, lng);
+          });
+          _checkBraceletLocationStatus(braceletId);
+          _updateBraceletMarker(braceletId);
+        }
+      }
+    });
+
+    _connectionListeners[braceletId] = dbRef
+        .child("bracelets/$braceletId/user_info/connected")
+        .onValue
+        .listen((event) {
+      bool connected = false;
+      if (event.snapshot.exists) {
+        connected = event.snapshot.value == true;
+      }
+
       setState(() {
-        braceletId = savedBraceletId;
+        _braceletConnections[braceletId] = connected;
       });
-      _checkConnectionAndLoadLocation();
-      _loadSafeZone();
-    } else {
+
+      _updateBraceletNotificationService(braceletId);
+      if (connected) {
+        _updateBraceletMarker(braceletId);
+      }
+    });
+
+    _stationaryListeners[braceletId] = dbRef
+        .child("bracelets/$braceletId/status/stationary")
+        .onValue
+        .listen((event) {
+      bool stationaryStatus = false;
+      if (event.snapshot.exists) {
+        stationaryStatus = event.snapshot.value == true;
+      }
+
       setState(() {
-        isLoading = false;
+        _braceletStationaryStatus[braceletId] = stationaryStatus;
+      });
+
+      _updateBraceletNotificationService(braceletId);
+    });
+  }
+
+  Future<void> _updateBraceletMarker(String braceletId) async {
+    final location = _braceletLocations[braceletId];
+    if (location == null) return;
+
+    final isInRedZone = _braceletInRedZone[braceletId] ?? false;
+    final isOutsideSafeZone = _braceletOutsideSafeZone[braceletId] ?? false;
+    final isStationary = _braceletStationaryStatus[braceletId] ?? false;
+    final isConnected = _braceletConnections[braceletId] ?? false;
+
+    final braceletName = _activeBracelets
+        .firstWhere((b) => b.id == braceletId,
+            orElse: () => BraceletModel(id: braceletId, name: 'Unknown'))
+        .name;
+
+    try {
+      final marker = await ChildLocationMarker.createBraceletMarker(
+        braceletId: braceletId,
+        position: location,
+        isInRedZone: isInRedZone,
+        isOutsideSafeZone: isOutsideSafeZone,
+      );
+
+      final updatedMarker = marker.copyWith(
+        infoWindowParam: InfoWindow(
+          title: braceletName,
+          snippet: !isConnected
+              ? "❌ Disconnected"
+              : isInRedZone
+                  ? "🚨 In Red Zone!"
+                  : isOutsideSafeZone
+                      ? "⚠️ Outside Safe Zone"
+                      : isStationary
+                          ? "⏸️ Stationary"
+                          : "✅ Safe",
+        ),
+      );
+
+      setState(() {
+        _braceletMarkers[braceletId] = updatedMarker;
+      });
+    } catch (e) {
+      setState(() {
+        _braceletMarkers[braceletId] = Marker(
+          markerId: MarkerId(braceletId),
+          position: location,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            !isConnected
+                ? BitmapDescriptor.hueViolet
+                : isInRedZone
+                    ? BitmapDescriptor.hueRed
+                    : isOutsideSafeZone
+                        ? BitmapDescriptor.hueOrange
+                        : BitmapDescriptor.hueBlue,
+          ),
+          infoWindow: InfoWindow(
+            title: braceletName,
+            snippet: !isConnected
+                ? "❌ Disconnected"
+                : isInRedZone
+                    ? "🚨 In Red Zone!"
+                    : isOutsideSafeZone
+                        ? "⚠️ Outside Safe Zone"
+                        : isStationary
+                            ? "⏸️ Stationary"
+                            : "✅ Safe",
+          ),
+        );
       });
     }
   }
 
-  Future<void> _loadSafeZone() async {
-    if (braceletId == null) return;
+  void _checkBraceletLocationStatus(String braceletId) {
+    final location = _braceletLocations[braceletId];
+    if (location == null) return;
 
+    bool outsideSafe = false;
+    bool insideRed = false;
+
+    final safeZonePoints = _safeZonePoints[braceletId];
+    if (safeZonePoints != null && safeZonePoints.length >= 3) {
+      outsideSafe = !_isPointInPolygon(location, safeZonePoints);
+    }
+
+    final redZonePoints = _redZonePoints[braceletId];
+    if (redZonePoints != null && redZonePoints.length >= 3) {
+      insideRed = _isPointInPolygon(location, redZonePoints);
+    }
+
+    setState(() {
+      _braceletOutsideSafeZone[braceletId] = outsideSafe;
+      _braceletInRedZone[braceletId] = insideRed;
+    });
+
+    dbRef.child("bracelets/$braceletId/alerts/out_of_zone").set(outsideSafe);
+    dbRef.child("bracelets/$braceletId/alerts/in_red_zone").set(insideRed);
+
+    _updateBraceletNotificationService(braceletId);
+  }
+
+  void _updateBraceletNotificationService(String braceletId) {
+    final braceletName = _activeBracelets
+        .firstWhere((b) => b.id == braceletId,
+            orElse: () => BraceletModel(id: braceletId, name: 'Unknown'))
+        .name;
+
+    _notificationService.updateBraceletStatus(
+      braceletId: braceletId,
+      braceletName: braceletName,
+      isConnected: _braceletConnections[braceletId] ?? false,
+      isOutsideSafeZone: _braceletOutsideSafeZone[braceletId] ?? false,
+      isInRedZone: _braceletInRedZone[braceletId] ?? false, isStationary: true,
+    );
+  }
+
+  Future<void> _loadBraceletZones(String braceletId) async {
+    await _loadBraceletSafeZone(braceletId);
+    await _loadBraceletRedZone(braceletId);
+  }
+
+  Future<void> _loadBraceletSafeZone(String braceletId) async {
     try {
       final safeZoneSnapshot =
           await dbRef.child("bracelets/$braceletId/safe_zone_polygon").get();
@@ -89,7 +297,6 @@ class _BraceletLocationScreenState extends State<GoogleMapScreen> {
         final data = safeZoneSnapshot.value as Map;
         List<LatLng> points = [];
 
-        // Load up to 4 points
         for (int i = 0; i < 4; i++) {
           if (data.containsKey('point$i')) {
             Map pointData = data['point$i'] as Map;
@@ -104,46 +311,56 @@ class _BraceletLocationScreenState extends State<GoogleMapScreen> {
 
         if (points.length >= 3) {
           setState(() {
-            safeZonePoints = points;
-            _updatePolygon();
+            _safeZonePoints[braceletId] = points;
           });
         }
       }
     } catch (e) {
-      print('Error loading safe zone: $e');
+      print("Error loading safe zone for $braceletId: $e");
     }
   }
 
-  void _updatePolygon() {
-    if (safeZonePoints.length < 3) {
-      safeZonePolygon = null;
-      return;
-    }
+  Future<void> _loadBraceletRedZone(String braceletId) async {
+    try {
+      final redZoneSnapshot =
+          await dbRef.child("bracelets/$braceletId/red_zone_polygon").get();
 
-    safeZonePolygon = Polygon(
-      polygonId: PolygonId('safeZone'),
-      points: List.from(safeZonePoints),
-      fillColor: Colors.green.withOpacity(0.2),
-      strokeColor: Colors.green,
-      strokeWidth: 2,
-    );
+      if (redZoneSnapshot.exists) {
+        final data = redZoneSnapshot.value as Map;
+        List<LatLng> points = [];
+
+        for (int i = 0; i < 4; i++) {
+          if (data.containsKey('point$i')) {
+            Map pointData = data['point$i'] as Map;
+            double? lat = double.tryParse(pointData['lat'].toString());
+            double? lng = double.tryParse(pointData['lng'].toString());
+
+            if (lat != null && lng != null) {
+              points.add(LatLng(lat, lng));
+            }
+          }
+        }
+
+        if (points.length >= 3) {
+          setState(() {
+            _redZonePoints[braceletId] = points;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error loading red zone for $braceletId: $e");
+    }
   }
 
-  Future<void> _checkConnectionAndLoadLocation() async {
-    if (braceletId == null) return;
-
-    setState(() {
-      isLoading = true;
-    });
-
+  Future<void> _checkBraceletConnectionAndLoadLocation(
+      String braceletId) async {
     try {
       final connectedSnapshot =
           await dbRef.child("bracelets/$braceletId/user_info/connected").get();
 
+      bool isConnected = false;
       if (connectedSnapshot.exists && connectedSnapshot.value == true) {
-        setState(() {
-          isConnected = true;
-        });
+        isConnected = true;
 
         final locationSnapshot =
             await dbRef.child("bracelets/$braceletId/location").get();
@@ -155,68 +372,73 @@ class _BraceletLocationScreenState extends State<GoogleMapScreen> {
 
           if (lat != null && lng != null) {
             setState(() {
-              braceletLocation = LatLng(lat, lng);
-
-              // Check if the bracelet is inside the safe zone
-              if (safeZonePoints.length >= 3 && braceletLocation != null) {
-                isOutsideSafeZone =
-                    !_isPointInPolygon(braceletLocation!, safeZonePoints);
-
-                dbRef
-                    .child("bracelets/$braceletId/alerts/out_of_zone")
-                    .set(isOutsideSafeZone);
-
-                if (isOutsideSafeZone) {
-                  _showOutOfZoneNotification();
-                }
-              }
+              _braceletLocations[braceletId] = LatLng(lat, lng);
             });
+            _checkBraceletLocationStatus(braceletId);
+            await _updateBraceletMarker(braceletId);
           }
         }
 
-        // التحقق من حالة الثبات
         final stationarySnapshot =
-            await dbRef.child("bracelets/$braceletId/alerts/stationary").get();
+            await dbRef.child("bracelets/$braceletId/status/stationary").get();
 
         if (stationarySnapshot.exists) {
           setState(() {
-            isStationary = stationarySnapshot.value == true;
+            _braceletStationaryStatus[braceletId] =
+                stationarySnapshot.value == true;
           });
         }
-      } else {
-        setState(() {
-          isConnected = false;
-        });
       }
-    } catch (e) {
-      print('Error loading data: $e');
+
       setState(() {
-        isConnected = false;
+        _braceletConnections[braceletId] = isConnected;
+      });
+    } catch (e) {
+      setState(() {
+        _braceletConnections[braceletId] = false;
       });
     }
 
-    setState(() {
-      isLoading = false;
-    });
+    _updateBraceletNotificationService(braceletId);
   }
 
-  // وظيفة لتوسيط الخريطة على موقع السوار
-  void _centerOnBraceletLocation() {
-    if (braceletLocation != null && mapController != null) {
+  void _centerOnAllBracelets() {
+    if (_braceletLocations.isEmpty || mapController == null) return;
+
+    if (_braceletLocations.length == 1) {
+      final location = _braceletLocations.values.first;
       mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: braceletLocation!,
-            zoom: 16,
+          CameraPosition(target: location, zoom: 16),
+        ),
+      );
+    } else {
+      final locations = _braceletLocations.values.toList();
+      double minLat = locations.first.latitude;
+      double maxLat = locations.first.latitude;
+      double minLng = locations.first.longitude;
+      double maxLng = locations.first.longitude;
+
+      for (LatLng location in locations) {
+        minLat = math.min(minLat, location.latitude);
+        maxLat = math.max(maxLat, location.latitude);
+        minLng = math.min(minLng, location.longitude);
+        maxLng = math.max(maxLng, location.longitude);
+      }
+
+      mapController!.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
           ),
+          100.0,
         ),
       );
     }
   }
 
-  // Check if a point is inside a polygon using the ray casting algorithm
   bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
-    // Ray casting algorithm
     bool isInside = false;
     int j = polygon.length - 1;
 
@@ -238,121 +460,102 @@ class _BraceletLocationScreenState extends State<GoogleMapScreen> {
     return isInside;
   }
 
-  Future<void> _showOutOfZoneNotification() async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'safe_zone_channel',
-      'Safe Zone Alerts',
-      importance: Importance.max,
-      priority: Priority.high,
-      ticker: 'ticker',
-    );
+  Future<void> _refreshData() async {
+    setState(() {
+      isLoading = true;
+    });
 
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
+    await _loadActiveBracelets();
 
-    await flutterLocalNotificationsPlugin.show(
-      0,
-      '⚠️ Alert',
-      'Bracelet has exited the safe zone!',
-      platformChannelSpecifics,
-    );
+    _braceletLocations.clear();
+    _braceletConnections.clear();
+    _braceletStationaryStatus.clear();
+    _braceletOutsideSafeZone.clear();
+    _braceletInRedZone.clear();
+    _braceletMarkers.clear();
+    _safeZonePoints.clear();
+    _redZonePoints.clear();
+
+    _locationListeners.values.forEach((listener) => listener.cancel());
+    _connectionListeners.values.forEach((listener) => listener.cancel());
+    _stationaryListeners.values.forEach((listener) => listener.cancel());
+
+    _locationListeners.clear();
+    _connectionListeners.clear();
+    _stationaryListeners.clear();
+
+    if (_activeBracelets.isNotEmpty) {
+      await _setupAllBracelets();
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _locationListeners.values.forEach((listener) => listener.cancel());
+    _connectionListeners.values.forEach((listener) => listener.cancel());
+    _stationaryListeners.values.forEach((listener) => listener.cancel());
+    _notificationService.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    bool hasConnectedBracelets =
+        _braceletConnections.values.any((connected) => connected);
+    bool hasOutsideSafeZone =
+        _braceletOutsideSafeZone.values.any((outside) => outside);
+    bool hasInRedZone = _braceletInRedZone.values.any((inRed) => inRed);
+    bool hasStationary =
+        _braceletStationaryStatus.values.any((stationary) => stationary);
+
     return Scaffold(
-      // تم إزالة الـ AppBar
       body: Stack(
         children: [
-          // الخريطة أو رسائل الحالة
-          if (isLoading && braceletId != null)
+          if (isLoading)
             Center(child: CircularProgressIndicator())
-          else if (braceletId == null)
+          else if (_activeBracelets.isEmpty)
             Center(
               child: Text(
-                'No bracelet configured ',
+                'No bracelets configured',
                 style: TextStyle(fontSize: 18),
               ),
             )
-          else if (!isConnected)
+          else if (!hasConnectedBracelets)
             Center(
               child: Text(
-                'No bracelet connected currently ',
+                'No bracelets connected currently',
                 style: TextStyle(fontSize: 18),
               ),
             )
-          else if (braceletLocation != null)
+          else
             GoogleMap(
               initialCameraPosition: CameraPosition(
-                target: braceletLocation!,
+                target: _braceletLocations.isNotEmpty
+                    ? _braceletLocations.values.first
+                    : LatLng(0, 0),
                 zoom: 16,
               ),
-              markers: {
-                Marker(
-                  markerId: MarkerId('bracelet'),
-                  position: braceletLocation!,
-                  infoWindow: InfoWindow(title: "Bracelet Location"),
-                ),
-                ...safeZonePoints.asMap().entries.map((entry) {
-                  int idx = entry.key;
-                  LatLng point = entry.value;
-                  return Marker(
-                    markerId: MarkerId("safe_point_$idx"),
-                    position: point,
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueGreen),
-                    infoWindow: InfoWindow(title: "Safe Zone Point ${idx + 1}"),
-                  );
-                }).toList(),
-              },
-              polygons: safeZonePolygon != null ? {safeZonePolygon!} : {},
+              markers: Set<Marker>.from(_braceletMarkers.values),
               onMapCreated: (controller) {
                 mapController = controller;
               },
-            )
-          else
-            Center(
-              child: Text(
-                'Bracelet location not available yet',
-                style: TextStyle(fontSize: 16),
-              ),
             ),
-
-          // الـ Custom Top SnackBar
           CustomTopSnackBar(
             isLoading: isLoading,
-            isConnected: isConnected,
-            isOutsideSafeZone: isOutsideSafeZone,
-            isStationary: isStationary,
-            braceletLocation: braceletLocation,
-            onRefresh: _checkConnectionAndLoadLocation,
-            onCenterLocation: _centerOnBraceletLocation,
+            isConnected: hasConnectedBracelets,
+            isOutsideSafeZone: hasOutsideSafeZone,
+            isStationary: hasStationary,
+            isInRedZone: hasInRedZone,
+            braceletLocation: _braceletLocations.isNotEmpty
+                ? _braceletLocations.values.first
+                : null,
+            onRefresh: _refreshData,
+            onCenterLocation: _centerOnAllBracelets,
           ),
-
-          // تنبيه خروج من المنطقة الآمنة (اختياري - يمكن الاستغناء عنه لأن السناك بار يظهر الحالة)
-          if (isOutsideSafeZone && braceletLocation != null)
-            Positioned(
-              bottom: 100,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  " Alert: Bracelet is outside the safe zone!",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
         ],
       ),
     );

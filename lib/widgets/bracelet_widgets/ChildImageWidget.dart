@@ -27,7 +27,7 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
     _loadSavedImage();
   }
 
-  // تحميل الصورة المحفوظة
+  // Load saved image
   Future<void> _loadSavedImage() async {
     final prefs = await SharedPreferences.getInstance();
     final savedPath = prefs.getString('child_image_${widget.braceletId}');
@@ -38,13 +38,13 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
     }
   }
 
-  // حفظ مسار الصورة
+  // Save image path
   Future<void> _saveImagePath(String path) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('child_image_${widget.braceletId}', path);
   }
 
-  // اختيار الصورة من الجاليري أو الكاميرا
+  // Choose image from gallery or camera
   Future<void> _pickImage() async {
     showModalBottomSheet(
       context: context,
@@ -54,7 +54,7 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
             children: [
               ListTile(
                 leading: Icon(Icons.photo_library),
-                title: Text('اختر من الجاليري'),
+                title: Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.of(context).pop();
                   _getImage(ImageSource.gallery);
@@ -62,7 +62,7 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
               ),
               ListTile(
                 leading: Icon(Icons.photo_camera),
-                title: Text('التقط صورة'),
+                title: Text('Take Photo'),
                 onTap: () {
                   Navigator.of(context).pop();
                   _getImage(ImageSource.camera);
@@ -71,7 +71,7 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
               if (_imagePath != null)
                 ListTile(
                   leading: Icon(Icons.delete, color: Colors.red),
-                  title: Text('حذف الصورة'),
+                  title: Text('Delete Image'),
                   onTap: () {
                     Navigator.of(context).pop();
                     _removeImage();
@@ -84,7 +84,7 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
     );
   }
 
-  // الحصول على الصورة
+  // Get image
   Future<void> _getImage(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -103,14 +103,14 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('خطأ في تحميل الصورة: $e'),
+          content: Text('Error loading image: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  // حذف الصورة
+  // Delete image
   Future<void> _removeImage() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('child_image_${widget.braceletId}');
@@ -137,7 +137,7 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
         child: _imagePath != null
             ? Stack(
                 children: [
-                  // الصورة
+                  // Image
                   ClipOval(
                     child: Image.file(
                       File(_imagePath!),
@@ -145,7 +145,7 @@ class _ChildImageWidgetState extends State<ChildImageWidget> {
                       height: widget.size,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        // في حالة وجود خطأ في تحميل الصورة، اعرض الدائرة الافتراضية
+                        // In case of image loading error, show default circle
                         return _buildDefaultCircle();
                       },
                     ),

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tracelet_app/auth_service/NotificationService.dart';
 import 'package:tracelet_app/constans/constans.dart';
 import 'package:tracelet_app/landing_screens/navigation_bar/navigationBar.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/NotificationSoundWidget.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/ProfilePictureWidget.dart';
+import 'package:tracelet_app/services/noti_service/NotificationService.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_landing_widget.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   // Notification controls
   bool _geofencingEnabled = true;
-  bool _emergencyAlertsEnabled = true;
+  bool _emergencyAlertsEnabled = true; // Mapped to Stationary
   bool _connectivityAlertsEnabled = true;
   bool _batteryAlertsEnabled = true;
   bool _networkAlertsEnabled = true;
@@ -29,7 +29,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Map<String, String> _notificationSounds = {
     'geofencing': 'default',
     'red_zone': 'urgent',
-    'emergency': 'alert',
+    'emergency': 'alert', // Used for stationary
     'connectivity': 'chime',
     'battery': 'beep',
     'network': 'gentle',
@@ -40,7 +40,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeService();
     _loadNotificationSettings();
+  }
+
+  // ✅ Initialize notification service
+  Future<void> _initializeService() async {
+    try {
+      await _notificationService.initialize();
+      print('NotificationService initialized in NotificationsScreen');
+    } catch (e) {
+      print('Error initializing NotificationService: $e');
+    }
   }
 
   // ✅ تحميل إعدادات النوتيفيكيشن والأصوات
@@ -73,9 +84,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _notificationSounds['network'] =
           prefs.getString('network_sound') ?? 'gentle';
     });
+    // Immediately update the service with loaded settings
+    _updateNotificationServiceSettings();
   }
 
-  // ✅ حفظ إعدادات النوتيفيكيشن
+  // ✅ حفظ إعدادات النوتيفيكيشن وتحديث السيرفيس
   Future<void> _saveNotificationSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('geofencing_enabled', _geofencingEnabled);
@@ -88,25 +101,60 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         'app_update_notifications_enabled', _appUpdateNotificationsEnabled);
     await prefs.setBool('beta_updates_enabled', _betaUpdatesEnabled);
     await prefs.setBool('red_zone_alerts_enabled', _redZoneAlertsEnabled);
+
+    // ✅ حفظ إعدادات الأصوات
+    for (String type in _notificationSounds.keys) {
+      await prefs.setString('${type}_sound', _notificationSounds[type]!);
+    }
+
+    // ✅ تحديث إعدادات السيرفيس للنوتيفيكيشن
+    _updateNotificationServiceSettings();
+
+    print('Notification settings saved and service updated');
+  }
+
+  // ✅ New: Centralized function to update NotificationService settings
+  void _updateNotificationServiceSettings() {
+    _notificationService.updateNotificationSettings({
+      'safe_zone_enabled': _geofencingEnabled,
+      'red_zone_enabled': _redZoneAlertsEnabled,
+      'stationary_enabled': _emergencyAlertsEnabled, // using emergency for stationary
+      'connectivity_enabled': _connectivityAlertsEnabled,
+      'battery_enabled': _batteryAlertsEnabled,
+      'network_enabled': _networkAlertsEnabled,
+      'app_update_enabled': _appUpdateNotificationsEnabled,
+      'beta_updates_enabled': _betaUpdatesEnabled,
+    });
+
+    _notificationSounds.forEach((type, sound) {
+      _notificationService.updateNotificationSound(type, sound);
+    });
   }
 
   // ✅ دالة للتعامل مع تغيير الصوت
-  void _handleSoundChange(String notificationType, String newSound) {
+  void _handleSoundChange(String notificationType, String newSound) async {
     setState(() {
       _notificationSounds[notificationType] = newSound;
     });
+
+    // حفظ الصوت الجديد
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('${notificationType}_sound', newSound);
+
+    // Update the service with the new sound
+    _notificationService.updateNotificationSound(notificationType, newSound);
+
     print('🔊 Sound changed for $notificationType: $newSound');
   }
 
-  // Control Geofencing (Safe Zone) notifications
-  void _handleGeofencingToggle(bool value) {
+  // ✅ Control Geofencing (Safe Zone) notifications
+  void _handleGeofencingToggle(bool value) async {
     setState(() {
       _geofencingEnabled = value;
     });
-    _saveNotificationSettings();
+    await _saveNotificationSettings();
 
     if (!value) {
-      _notificationService.reset();
       print('🔴 Geofencing notifications disabled');
       _showSnackBar('Safe zone notifications disabled', Colors.red);
     } else {
@@ -116,14 +164,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   // ✅ Control Red Zone notifications
-  void _handleRedZoneToggle(bool value) {
+  void _handleRedZoneToggle(bool value) async {
     setState(() {
       _redZoneAlertsEnabled = value;
     });
-    _saveNotificationSettings();
+    await _saveNotificationSettings();
 
     if (!value) {
-      _notificationService.reset();
       print('🔥 Red Zone notifications disabled');
       _showSnackBar('Red Zone notifications disabled', Colors.red);
     } else {
@@ -132,28 +179,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // Control emergency notifications
-  void _handleEmergencyAlertsToggle(bool value) {
+  // ✅ Control emergency notifications (mapped to stationary)
+  void _handleEmergencyAlertsToggle(bool value) async {
     setState(() {
       _emergencyAlertsEnabled = value;
     });
-    _saveNotificationSettings();
+    await _saveNotificationSettings();
 
     if (!value) {
-      print('🔴 Emergency alerts disabled');
-      _showSnackBar('Emergency alerts disabled', Colors.red);
+      print('🔴 Stationary alerts disabled');
+      _showSnackBar('Movement alerts disabled', Colors.red);
     } else {
-      print('🟢 Emergency alerts enabled');
-      _showSnackBar('Emergency alerts enabled', Colors.green);
+      print('🟢 Stationary alerts enabled');
+      _showSnackBar('Movement alerts enabled', Colors.green);
     }
   }
 
-  // Control connectivity notifications
-  void _handleConnectivityAlertsToggle(bool value) {
+  // ✅ Control connectivity notifications (UI only - not connected to service for actual events, but for test)
+  void _handleConnectivityAlertsToggle(bool value) async {
     setState(() {
       _connectivityAlertsEnabled = value;
     });
-    _saveNotificationSettings();
+    await _saveNotificationSettings();
 
     if (!value) {
       print('🔴 Connectivity alerts disabled');
@@ -191,8 +238,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             TextButton(
               child: const Text('Reset', style: TextStyle(color: Colors.red)),
-              onPressed: () {
-                _notificationService.reset();
+              onPressed: () async {
                 setState(() {
                   _geofencingEnabled = false;
                   _emergencyAlertsEnabled = false;
@@ -213,7 +259,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     'network': 'default',
                   };
                 });
-                _saveNotificationSettings();
+                // ✅ Reset service after updating local state
+                _notificationService.reset();
+                await _saveNotificationSettings(); // Save the disabled state to SharedPreferences
                 Navigator.of(context).pop();
                 _showSnackBar('All notifications reset', Colors.orange);
               },
@@ -222,6 +270,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         );
       },
     );
+  }
+
+  // ✅ Test notification function
+  void _testNotification(String type) async {
+    try {
+      String braceletName = 'Test Bracelet';
+      // The service will now check its internal settings before sending
+      await _notificationService.sendTestNotification(type, braceletName);
+      _showSnackBar('Test notification sent for $type (if enabled)', Colors.blue);
+    } catch (e) {
+      print('Error sending test notification: $e');
+      _showSnackBar('Failed to send test notification', Colors.red);
+    }
   }
 
   @override
@@ -302,6 +363,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             _handleGeofencingToggle,
                             'geofencing',
                             subtitle: 'Safe zone entry/exit alerts',
+                            testFunction: () => _testNotification('safe_zone'),
                           ),
                           _buildSwitchOptionWithSound(
                             'Red Zone Alerts',
@@ -309,13 +371,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             _handleRedZoneToggle,
                             'red_zone',
                             subtitle: 'Dangerous area alerts',
+                            testFunction: () => _testNotification('red_zone'),
                           ),
                           _buildSwitchOptionWithSound(
                             'Emergency Alerts',
                             _emergencyAlertsEnabled,
                             _handleEmergencyAlertsToggle,
                             'emergency',
-                            subtitle: 'Critical location alerts',
+                            subtitle: 'Movement detection alerts',
+                            testFunction: () => _testNotification('stationary'),
                           ),
                           _buildSwitchOptionWithSound(
                             'Connectivity Alerts',
@@ -323,6 +387,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             _handleConnectivityAlertsToggle,
                             'connectivity',
                             subtitle: 'Device connection status',
+                            testFunction: () => _testNotification('connectivity'), // Test connectivity
                           ),
                         ],
                       ),
@@ -334,22 +399,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           _buildSwitchOptionWithSound(
                             'Battery Alerts',
                             _batteryAlertsEnabled,
-                            (value) {
+                            (value) async {
                               setState(() => _batteryAlertsEnabled = value);
-                              _saveNotificationSettings();
+                              await _saveNotificationSettings();
                             },
                             'battery',
                             subtitle: 'Low battery warnings',
+                            testFunction: () => _testNotification('battery'), // Test battery
                           ),
                           _buildSwitchOptionWithSound(
                             'Network Alerts',
                             _networkAlertsEnabled,
-                            (value) {
+                            (value) async {
                               setState(() => _networkAlertsEnabled = value);
-                              _saveNotificationSettings();
+                              await _saveNotificationSettings();
                             },
                             'network',
                             subtitle: 'Network connectivity issues',
+                            testFunction: () => _testNotification('network'), // Test network
                           ),
                         ],
                       ),
@@ -361,19 +428,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           _buildSwitchOption(
                             'App Update Notifications',
                             _appUpdateNotificationsEnabled,
-                            (value) {
+                            (value) async {
                               setState(
                                   () => _appUpdateNotificationsEnabled = value);
-                              _saveNotificationSettings();
+                              await _saveNotificationSettings();
                             },
                             subtitle: 'New version available',
                           ),
                           _buildSwitchOption(
                             'Beta Updates',
                             _betaUpdatesEnabled,
-                            (value) {
+                            (value) async {
                               setState(() => _betaUpdatesEnabled = value);
-                              _saveNotificationSettings();
+                              await _saveNotificationSettings();
                             },
                             subtitle: 'Early access features',
                           ),
@@ -394,9 +461,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  // ✅ Show current status
+  // ✅ Show current status from notification service
   Widget _buildStatusSection() {
+    // Get status from NotificationService
     Map<String, dynamic> status = _notificationService.getCurrentStatus();
+
+    // Extract notification settings for display
+    Map<String, bool> notificationSettings = status['notification_settings'] ?? {};
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -423,25 +494,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildStatusRow(
-              'Bracelet ID', status['bracelet_id'] ?? 'Not connected'),
-          _buildStatusRow(
-              'Connected', status['is_connected'] == true ? '✅ Yes' : '❌ No'),
-          _buildStatusRow(
-              'Safe Zone Timer',
-              status['safe_zone_timer_active'] == true
-                  ? '🔴 Active'
-                  : '⚫ Inactive'),
-          _buildStatusRow(
-              'Red Zone Timer',
-              status['red_zone_timer_active'] == true
-                  ? '🔥 Active'
-                  : '⚫ Inactive'),
-          _buildStatusRow(
-              'Stationary Timer',
-              status['stationary_timer_active'] == true
-                  ? '🟠 Active'
-                  : '⚫ Inactive'),
+          _buildStatusRow('Service Initialized',
+              status['initialized'] == true ? '✅ Yes' : '❌ No'),
+          _buildStatusRow('Safe Zone Enabled',
+              notificationSettings['safe_zone_enabled'] == true ? '✅ On' : '❌ Off'),
+          _buildStatusRow('Red Zone Enabled',
+              notificationSettings['red_zone_enabled'] == true ? '🔥 On' : '❌ Off'),
+          _buildStatusRow('Stationary Enabled',
+              notificationSettings['stationary_enabled'] == true ? '🟠 On' : '❌ Off'),
+          _buildStatusRow('Connectivity Enabled',
+              notificationSettings['connectivity_enabled'] == true ? '🔗 On' : '❌ Off'),
+          _buildStatusRow('Battery Alerts Enabled',
+              notificationSettings['battery_enabled'] == true ? '🔋 On' : '❌ Off'),
+          _buildStatusRow('Network Alerts Enabled',
+              notificationSettings['network_enabled'] == true ? '📡 On' : '❌ Off'),
+          _buildStatusRow('App Updates Enabled',
+              notificationSettings['app_update_enabled'] == true ? '⬆️ On' : '❌ Off'),
+          _buildStatusRow('Beta Updates Enabled',
+              notificationSettings['beta_updates_enabled'] == true ? '🧪 On' : '❌ Off'),
         ],
       ),
     );
@@ -482,10 +552,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  // ✅ Switch option with sound control
+  // ✅ Switch option with sound control and optional test button
   Widget _buildSwitchOptionWithSound(String label, bool value,
       Function(bool) onChanged, String notificationType,
-      {String? subtitle}) {
+      {String? subtitle, VoidCallback? testFunction}) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
@@ -522,6 +592,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ],
                   ),
                 ),
+                // ✅ Test button for service-connected notifications
+                if (testFunction != null && value)
+                  IconButton(
+                    icon: const Icon(Icons.texture_sharp, size: 20),
+                    onPressed: testFunction,
+                    tooltip: 'Test',
+                  ),
                 Switch(
                   value: value,
                   onChanged: onChanged,
@@ -590,28 +667,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  // ✅ Check notification settings before sending
-  bool shouldSendNotification(String notificationType) {
-    switch (notificationType) {
-      case 'geofencing':
-        return _geofencingEnabled;
-      case 'red_zone':
-        return _redZoneAlertsEnabled;
-      case 'emergency':
-        return _emergencyAlertsEnabled;
-      case 'connectivity':
-        return _connectivityAlertsEnabled;
-      case 'battery':
-        return _batteryAlertsEnabled;
-      case 'network':
-        return _networkAlertsEnabled;
-      default:
-        return false;
-    }
-  }
+  // ✅ Check notification settings before sending (This is now redundant as service handles it)
+  // bool shouldSendNotification(String notificationType) {
+  //   switch (notificationType) {
+  //     case 'geofencing':
+  //       return _geofencingEnabled;
+  //     case 'red_zone':
+  //       return _redZoneAlertsEnabled;
+  //     case 'emergency':
+  //       return _emergencyAlertsEnabled;
+  //     case 'connectivity':
+  //       return _connectivityAlertsEnabled;
+  //     case 'battery':
+  //       return _batteryAlertsEnabled;
+  //     case 'network':
+  //       return _networkAlertsEnabled;
+  //     default:
+  //       return false;
+  //   }
+  // }
 
-  // ✅ Get selected sound for notification type
+  // ✅ Get selected sound for notification type (This is now used to initialize NotificationSoundWidget)
   String getNotificationSound(String notificationType) {
     return _notificationSounds[notificationType] ?? 'default';
+  }
+
+  @override
+  void dispose() {
+    // Don't dispose the service here as it might be used elsewhere
+    super.dispose();
   }
 }

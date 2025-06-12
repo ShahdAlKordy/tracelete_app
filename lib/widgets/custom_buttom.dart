@@ -3,7 +3,7 @@ import 'package:tracelet_app/constans/constans.dart';
 
 class CustomButton extends StatelessWidget {
   final String text;
-  final VoidCallback? onTap; // جعلها final
+  final VoidCallback? onTap; // Make it final
 
   const CustomButton({
     super.key,
@@ -18,8 +18,7 @@ class CustomButton extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: onTap, 
-          
+          onPressed: onTap,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryColor,
             padding: const EdgeInsets.symmetric(vertical: 15),

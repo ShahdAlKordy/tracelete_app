@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tracelet_app/auth_screens/Forget_Password.dart';
 import 'package:tracelet_app/auth_screens/Sign_In_Screen.dart';
-import 'package:tracelet_app/auth_service/auth_service.dart';
 import 'package:tracelet_app/constans/constans.dart';
 import 'package:tracelet_app/controllers/navigation_controller.dart';
 import 'package:tracelet_app/landing_screens/screens/home_screens/map_screen.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/main_profile_screen.dart';
+import 'package:tracelet_app/services/auth_service.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_auth_widget.dart';
 import 'package:tracelet_app/widgets/custom_buttom.dart';
 import 'package:tracelet_app/widgets/custom_text_filed.dart';
@@ -28,9 +29,15 @@ class _LoginScreenState extends State<LoginScreen> {
       var user = await _authService.signIn(
           email: email, password: password, context: context);
       if (user != null) {
+        // حفظ حالة تسجيل الدخول
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setString('userEmail', email);
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => NavigationController(initialIndex: 0)),
+          MaterialPageRoute(
+              builder: (context) => NavigationController(initialIndex: 0)),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -110,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don’t have an account?"),
+                      const Text("Don't have an account?"),
                       TextButton(
                         onPressed: () {
                           Navigator.push(

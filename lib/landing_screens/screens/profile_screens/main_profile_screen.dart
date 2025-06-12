@@ -1,21 +1,15 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tracelet_app/auth_screens/Log_In_Screen.dart';
 import 'package:tracelet_app/constans/constans.dart';
-import 'package:tracelet_app/controllers/navigation_controller.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/ProfilePictureWidget.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/account_screen.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/SafeZoneScreen_screen.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/notifications_screen.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_landing_widget.dart';
-import 'package:tracelet_app/landing_screens/navigation_bar/navigationBar.dart';
-// استيراد الويدجت الجديد
 
 class MainProfileScreen extends StatefulWidget {
   const MainProfileScreen({super.key});
@@ -115,13 +109,22 @@ class _MainProfileScreenState extends State<MainProfileScreen> {
   Widget _buildProfileSection(double screenWidth, double screenHeight) {
     return Column(
       children: [
-        // استخدام الويدجت الجديد للصورة الشخصية
-        ProfilePictureWidget(
-          size: screenWidth * 0.32,
-          showEditIcon: true,
-          defaultImagePath: "assets/images/pro.png",
+        Container(
+          child: Column(
+            children: [
+              SizedBox(height: screenHeight * 0.03),
+              ProfilePictureWidget(
+                size: screenWidth * 0.32,
+                onImageChanged: () {
+                  setState(() {});
+                },
+                showEditIcon: true,
+                defaultImagePath: 'assets/images/pro.png',
+              ),
+              SizedBox(height: screenHeight * 0.02),
+            ],
+          ),
         ),
-
         SizedBox(height: screenHeight * 0.02),
         Text(
           _userName,
@@ -166,7 +169,7 @@ class _MainProfileScreenState extends State<MainProfileScreen> {
             _buildOptionItem(
               icon: Icons.safety_check,
               text: 'SafeZone',
-              onTap: () => Get.to(() => SafeZoneScreen()),
+              onTap: () => Get.to(() => ZoneManagementScreen()),
             ),
             _buildOptionItem(
               icon: Icons.notifications,
@@ -187,7 +190,7 @@ class _MainProfileScreenState extends State<MainProfileScreen> {
                     borderRadius: BorderRadius.circular(screenWidth * 0.04),
                   ),
                 ),
-                onPressed: _logout,
+                onPressed: _showLogoutDialog,
                 icon: const Icon(Icons.logout, color: Colors.white),
                 label: const Text('Log Out',
                     style: TextStyle(color: Colors.white)),
@@ -199,8 +202,94 @@ class _MainProfileScreenState extends State<MainProfileScreen> {
     );
   }
 
+  // Logout confirmation dialog
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Log Out'),
+          content: const Text('Are you sure you want to log out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Enhanced logout method
   void _logout() async {
-    await FirebaseAuth.instance.signOut();
-    Get.offAll(() => LoginScreen());
+    try {
+      // Show loading indicator
+      Get.dialog(
+        const Center(
+          child: CircularProgressIndicator(),
+        ),
+        barrierDismissible: false,
+      );
+
+      // Clear SharedPreferences data first
+      await _clearLocalData();
+      
+      // Sign out from Firebase
+      await FirebaseAuth.instance.signOut();
+      
+      // Hide loading indicator
+      Get.back();
+      
+      // Navigate to login screen and clear all routes
+      Get.offAll(() => LoginScreen());
+      
+      // Show success message
+      Get.snackbar(
+        'Success',
+        'Logged out successfully',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      
+    } catch (e) {
+      // Hide loading indicator in case of error
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+      
+      // Show error message
+      Get.snackbar(
+        'Error',
+        'Error during logout: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  // Method to clear local data
+  Future<void> _clearLocalData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('isLoggedIn');
+      await prefs.remove('userEmail');
+      // Clear any other user-related data you might have stored
+      // You can add specific keys here instead of clearing everything
+      // await prefs.clear(); // Use this only if you want to clear ALL preferences
+      print("Local data cleared successfully");
+    } catch (e) {
+      print("Error clearing local data: $e");
+    }
   }
 }

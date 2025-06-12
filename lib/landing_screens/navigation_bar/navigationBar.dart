@@ -17,11 +17,11 @@ class CustomBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(bottom: 1, left: 2, right: 2),
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      margin: EdgeInsets.only(bottom: 0, left: 0, right: 0),
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.primaryColor,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -33,8 +33,8 @@ class CustomBottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(0, Icons.bar_chart, 'Activity'),
-          _buildNavItem(1, Icons.smart_toy, 'AI'),
+          _buildNavItem(0, Icons.location_on, 'TrackMe'),
+          _buildNavItem(1, Icons.voice_chat, 'Tracelet Chat'),
           _buildNavItem(2, Icons.watch, 'Bracelet'),
           _buildNavItem(3, Icons.person, 'Profile'),
         ],

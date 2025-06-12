@@ -52,7 +52,7 @@ class _AddBraceletDialogState extends State<AddBraceletDialog> {
     });
 
     try {
-      // التحقق من وجود السوار في قاعدة البيانات
+      // Check if bracelet exists in database
       final snapshot = await dbRef.child("bracelets/$braceletId").get();
 
       if (!snapshot.exists) {
@@ -62,12 +62,12 @@ class _AddBraceletDialogState extends State<AddBraceletDialog> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('السيريال غير مسجل')),
+          SnackBar(content: Text('Serial number not registered')),
         );
         return;
       }
 
-      // التحقق من أن البريسليت غير مربوط بمستخدم آخر
+      // Check if bracelet is not already connected to another user
       final braceletData = snapshot.value as Map<dynamic, dynamic>?;
       if (braceletData != null &&
           braceletData['user_info'] != null &&
@@ -79,12 +79,12 @@ class _AddBraceletDialogState extends State<AddBraceletDialog> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('هذا البريسليت مربوط بمستخدم آخر')),
+          SnackBar(content: Text('This bracelet is connected to another user')),
         );
         return;
       }
 
-      // تسجيل البيانات على Firebase Realtime Database
+      // Register data on Firebase Realtime Database
       await dbRef.child("bracelets/$braceletId/user_info").set({
         "connected": true,
         "owner_number": ownerNumber,

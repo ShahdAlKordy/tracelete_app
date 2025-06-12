@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tracelet_app/auth_screens/log_in_screen.dart';
-import 'package:tracelet_app/auth_service/auth_service.dart';
 import 'package:tracelet_app/constans/constans.dart';
+import 'package:tracelet_app/services/auth_service.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_auth_widget.dart';
 import 'package:tracelet_app/widgets/custom_buttom.dart';
 import 'package:tracelet_app/widgets/custom_text_filed.dart';

@@ -21,7 +21,7 @@ class BraceletsScreen extends StatefulWidget {
 class _BraceletsScreenState extends State<BraceletsScreen> {
   List<BraceletModel> _bracelets = [];
   bool _isLoading = true;
-  
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -48,15 +48,14 @@ class _BraceletsScreenState extends State<BraceletsScreen> {
           .where("is_active", isEqualTo: true)
           .get();
 
-      final List<BraceletModel> loadedBracelets = braceletsSnapshot.docs
-          .map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return BraceletModel(
-              id: data['bracelet_id'] ?? doc.id,
-              name: data['name'] ?? 'Bracelet ${doc.id}',
-            );
-          })
-          .toList();
+      final List<BraceletModel> loadedBracelets =
+          braceletsSnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return BraceletModel(
+          id: data['bracelet_id'] ?? doc.id,
+          name: data['name'] ?? 'Bracelet ${doc.id}',
+        );
+      }).toList();
 
       setState(() {
         _bracelets = loadedBracelets;
@@ -90,7 +89,7 @@ class _BraceletsScreenState extends State<BraceletsScreen> {
     );
 
     await _saveBraceletToPreferences(bracelet.id);
-    
+
     setState(() {
       _bracelets.add(bracelet);
     });
@@ -168,12 +167,13 @@ class _BraceletsScreenState extends State<BraceletsScreen> {
   Future<void> _removeBraceletFromPreferences(String braceletId) async {
     final prefs = await SharedPreferences.getInstance();
     final savedBraceletId = prefs.getString('bracelet_id');
-    
+
     if (savedBraceletId == braceletId) {
       await prefs.remove('bracelet_id');
-      
+
       if (_bracelets.isNotEmpty) {
-        final remainingBracelets = _bracelets.where((b) => b.id != braceletId).toList();
+        final remainingBracelets =
+            _bracelets.where((b) => b.id != braceletId).toList();
         if (remainingBracelets.isNotEmpty) {
           await prefs.setString('bracelet_id', remainingBracelets.first.id);
         }
@@ -183,14 +183,16 @@ class _BraceletsScreenState extends State<BraceletsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final screenHeight = screenSize.height;
+    final screenWidth = screenSize.width;
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: BackgroundLanding(
         child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              if (_isLoading) {
-                return Center(
+          child: _isLoading
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -199,39 +201,46 @@ class _BraceletsScreenState extends State<BraceletsScreen> {
                       Text('Loading data...'),
                     ],
                   ),
-                );
-              }
-
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Column(
-                    children: [
-                      BraceletHeader(),
-                      SizedBox(height: constraints.maxHeight * 0.095),
-                      // Replace CircleAvatar with ProfilePictureWidget
-                      ProfilePictureWidget(
-                        size: MediaQuery.of(context).size.width * 0.32,
-                        onImageChanged: () {
-                          // Refresh UI when image changes
-                          setState(() {});
-                        },
-                        showEditIcon: true,
-                        defaultImagePath: 'assets/images/pro.png',
+                )
+              : Column(
+                  children: [
+                    // Fixed Header Section
+                    Container(
+                      child: Column(
+                        children: [
+                          BraceletHeader(),
+                          SizedBox(height: screenHeight * 0.07),
+                          ProfilePictureWidget(
+                            size: screenWidth * 0.32,
+                            onImageChanged: () {
+                              setState(() {});
+                            },
+                            showEditIcon: true,
+                            defaultImagePath: 'assets/images/pro.png',
+                          ),
+                          SizedBox(height: screenHeight * 0.01),
+                        ],
                       ),
-                      SizedBox(height: constraints.maxHeight * 0.05),
-                      BraceletsContent(
-                        bracelets: _bracelets,
-                        onAddBracelet: _showAddBraceletDialog,
-                        onEditBracelet: _editBraceletName,
-                        onRemoveBracelet: _removeBracelet,
+                    ),
+                    // Scrollable Content Section
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: BouncingScrollPhysics(),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenWidth * 0.01,
+                          ),
+                          child: BraceletsContent(
+                            bracelets: _bracelets,
+                            onAddBracelet: _showAddBraceletDialog,
+                            onEditBracelet: _editBraceletName,
+                            onRemoveBracelet: _removeBracelet,
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              );
-            },
-          ),
         ),
       ),
     );
