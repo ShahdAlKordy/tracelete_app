@@ -24,7 +24,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 void main() async {
-  // تأكد من أن Flutter جاهز قبل أي عملية تهيئة
   WidgetsFlutterBinding.ensureInitialized();
 
   // تهيئة Firebase
