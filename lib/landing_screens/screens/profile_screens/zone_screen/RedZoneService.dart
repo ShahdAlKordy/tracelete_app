@@ -1,6 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:tracelet_app/landing_screens/screens/profile_screens/SafeZoneScreen_screen.dart';
+import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/ZoneScreen_screen.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/ZoneData.dart';
 
 class RedZoneService {

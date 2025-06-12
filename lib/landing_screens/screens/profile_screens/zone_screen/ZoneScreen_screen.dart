@@ -4,13 +4,12 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:tracelet_app/constans/constans.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/RedZoneService.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/SafeZoneService.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/ZoneData.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/ZoneUIComponents.dart';
 import 'dart:math' as math;
-
-
 
 class ZoneManagementScreen extends StatefulWidget {
   @override
@@ -93,8 +92,8 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
           .get();
 
       final List<BraceletModel> loadedBracelets = braceletsSnapshot.docs
-          .map((doc) => BraceletModel.fromMap(
-              doc.data() as Map<String, dynamic>, doc.id))
+          .map((doc) =>
+              BraceletModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
 
       setState(() {
@@ -167,7 +166,7 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
       final redZone = await _redZoneService.loadRedZone(_braceletId!);
       if (redZone != null) {
         _allZones['red_zone'] = redZone;
-        
+
         if (_currentZoneType == ZoneType.red) {
           setState(() {
             _currentRedZoneMode = redZone.redZoneMode ?? RedZoneMode.custom;
@@ -217,9 +216,12 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
   double _calculateDistance(LatLng point1, LatLng point2) {
     var p = 0.017453292519943295;
     var c = math.cos;
-    var a = 0.5 - c((point2.latitude - point1.latitude) * p) / 2 +
-        c(point1.latitude * p) * c(point2.latitude * p) *
-        (1 - c((point2.longitude - point1.longitude) * p)) / 2;
+    var a = 0.5 -
+        c((point2.latitude - point1.latitude) * p) / 2 +
+        c(point1.latitude * p) *
+            c(point2.latitude * p) *
+            (1 - c((point2.longitude - point1.longitude) * p)) /
+            2;
     return 12742 * math.asin(math.sqrt(a));
   }
 
@@ -227,13 +229,14 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
     setState(() {
       _currentZoneType = newType;
       _currentZonePoints.clear();
-      
+
       // Load existing zone if available
       String zoneKey = newType == ZoneType.safe ? 'safe_zone' : 'red_zone';
       if (_allZones.containsKey(zoneKey)) {
         _currentZonePoints = List.from(_allZones[zoneKey]!.points);
         if (newType == ZoneType.red) {
-          _currentRedZoneMode = _allZones[zoneKey]!.redZoneMode ?? RedZoneMode.custom;
+          _currentRedZoneMode =
+              _allZones[zoneKey]!.redZoneMode ?? RedZoneMode.custom;
         }
       }
     });
@@ -259,7 +262,8 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
         await _safeZoneService.saveSafeZone(_braceletId!, _currentZonePoints);
         _showSnackBar('Safe Zone Saved Successfully ✅');
       } else {
-        await _redZoneService.saveRedZone(_braceletId!, _currentZonePoints, _currentRedZoneMode);
+        await _redZoneService.saveRedZone(
+            _braceletId!, _currentZonePoints, _currentRedZoneMode);
         _showSnackBar(_redZoneService.getSuccessMessage(_currentRedZoneMode));
       }
 
@@ -286,7 +290,8 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
 
       setState(() {
         _currentZonePoints.clear();
-        String zoneKey = _currentZoneType == ZoneType.safe ? 'safe_zone' : 'red_zone';
+        String zoneKey =
+            _currentZoneType == ZoneType.safe ? 'safe_zone' : 'red_zone';
         _allZones.remove(zoneKey);
       });
     } catch (e) {
@@ -317,7 +322,7 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
       if (zone.points.isNotEmpty && zone.points.length >= 3) {
         Color color;
         String polygonId;
-        
+
         if (zone.type == ZoneType.safe) {
           color = Colors.green.withOpacity(0.3);
           polygonId = 'safe_zone_existing';
@@ -338,8 +343,8 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
 
     // Add current editing zone
     if (_currentZonePoints.length >= 3) {
-      Color color = _currentZoneType == ZoneType.safe 
-          ? Colors.green.withOpacity(0.5) 
+      Color color = _currentZoneType == ZoneType.safe
+          ? Colors.green.withOpacity(0.5)
           : Colors.red.withOpacity(0.5);
 
       polygons.add(Polygon(
@@ -395,8 +400,12 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Zone Management'),
-          backgroundColor: Colors.blue,
+          title: Text(
+            'Zone Management',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: AppColors.primaryColor,
+          iconTheme: IconThemeData(color: Colors.white),
         ),
         body: Center(
           child: CircularProgressIndicator(),
@@ -407,8 +416,12 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
     if (_activeBracelets.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Zone Management'),
-          backgroundColor: Colors.blue,
+          title: Text(
+            'Zone Management',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: AppColors.primaryColor,
+          iconTheme: IconThemeData(color: Colors.white),
         ),
         body: Center(
           child: Column(
@@ -435,8 +448,12 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Zone Management'),
-        backgroundColor: Colors.blue,
+        title: Text(
+          'Zone Management',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: AppColors.primaryColor,
+        iconTheme: IconThemeData(color: Colors.white),
         elevation: 0,
       ),
       body: Column(
@@ -464,7 +481,8 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
           // Instructions
           ZoneUIComponents.buildInstructions(
             zoneType: _currentZoneType,
-            redZoneMode: _currentZoneType == ZoneType.red ? _currentRedZoneMode : null,
+            redZoneMode:
+                _currentZoneType == ZoneType.red ? _currentRedZoneMode : null,
             currentPoints: _currentZonePoints.length,
             maxPoints: _maxPoints,
             braceletName: _selectedBracelet?.name,
@@ -475,9 +493,10 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
             child: GoogleMap(
               onMapCreated: (GoogleMapController controller) {
                 _mapController = controller;
-                
+
                 // Apply red zone style if in auto red zone mode
-                if (_currentZoneType == ZoneType.red && _currentRedZoneMode == RedZoneMode.auto) {
+                if (_currentZoneType == ZoneType.red &&
+                    _currentRedZoneMode == RedZoneMode.auto) {
                   controller.setMapStyle(RedZoneService.redZoneMapStyle);
                 } else {
                   controller.setMapStyle(null);
@@ -497,7 +516,8 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
           // Action Buttons
           ZoneUIComponents.buildActionButtons(
             zoneType: _currentZoneType,
-            redZoneMode: _currentZoneType == ZoneType.red ? _currentRedZoneMode : null,
+            redZoneMode:
+                _currentZoneType == ZoneType.red ? _currentRedZoneMode : null,
             currentPoints: _currentZonePoints.length,
             hasExistingZone: hasExistingZone,
             onSave: _saveCurrentZone,

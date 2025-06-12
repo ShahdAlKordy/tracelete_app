@@ -11,6 +11,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:tracelet_app/services/noti_service/NotificationService.dart';
 import 'package:tracelet_app/landing_screens/screens/home_screens/ChildLocationMarker.dart';
 import 'package:tracelet_app/landing_screens/screens/home_screens/CustomTopSnackBar.dart';
+import 'package:tracelet_app/landing_screens/screens/home_screens/FloatingBraceletBar.dart';
 import 'package:tracelet_app/widgets/bracelet_widgets/BraceletModel.dart';
 import 'dart:math' as math;
 
@@ -279,7 +280,8 @@ class _BraceletLocationScreenState extends State<GoogleMapScreen> {
       braceletName: braceletName,
       isConnected: _braceletConnections[braceletId] ?? false,
       isOutsideSafeZone: _braceletOutsideSafeZone[braceletId] ?? false,
-      isInRedZone: _braceletInRedZone[braceletId] ?? false, isStationary: true,
+      isInRedZone: _braceletInRedZone[braceletId] ?? false,
+      isStationary: true,
     );
   }
 
@@ -438,6 +440,23 @@ class _BraceletLocationScreenState extends State<GoogleMapScreen> {
     }
   }
 
+  void _centerOnBracelet(String braceletId) {
+    final location = _braceletLocations[braceletId];
+    if (location != null && mapController != null) {
+      mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: location, zoom: 18),
+        ),
+      );
+    }
+  }
+
+  List<BraceletModel> _getConnectedBracelets() {
+    return _activeBracelets.where((bracelet) {
+      return _braceletConnections[bracelet.id] == true;
+    }).toList();
+  }
+
   bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
     bool isInside = false;
     int j = polygon.length - 1;
@@ -556,6 +575,13 @@ class _BraceletLocationScreenState extends State<GoogleMapScreen> {
             onRefresh: _refreshData,
             onCenterLocation: _centerOnAllBracelets,
           ),
+          // السناك بار العائم الجديد
+          if (hasConnectedBracelets)
+            FloatingBraceletBar(
+              connectedBracelets: _getConnectedBracelets(),
+              braceletLocations: _braceletLocations,
+              onBraceletTap: _centerOnBracelet,
+            ),
         ],
       ),
     );

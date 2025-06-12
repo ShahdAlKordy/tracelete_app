@@ -32,6 +32,9 @@ class CustomTopSnackBar extends StatefulWidget {
 class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
   String? _profileImagePath;
 
+  // اللون الثابت للأزرار والخلفية
+  static const Color _fixedColor = Color(0xff243561);
+
   @override
   void initState() {
     super.initState();
@@ -64,14 +67,14 @@ class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
           // Profile Picture Circle
           _buildProfileCircle(),
 
-          SizedBox(width: 12),
+          SizedBox(width: 8),
 
           // Location Details Rectangle
           Expanded(
             child: _buildLocationDetails(),
           ),
 
-          SizedBox(width: 16),
+          SizedBox(width: 8),
 
           // Refresh Button
           _buildCircularButton(
@@ -80,7 +83,7 @@ class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
             isLoading: widget.isLoading,
           ),
 
-          SizedBox(width: 12),
+          SizedBox(width: 8),
 
           // Center Location Button
           _buildCircularButton(
@@ -100,11 +103,11 @@ class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        color: _getButtonColor(),
+        color: _fixedColor, // لون ثابت
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: _getButtonColor().withOpacity(0.3),
+            color: _fixedColor.withOpacity(0.3),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -147,12 +150,13 @@ class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: isEnabled ? _getButtonColor() : Colors.grey[300],
+          color: isEnabled
+              ? _fixedColor
+              : Colors.grey[300], // لون ثابت للأزرار المفعلة
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: (isEnabled ? _getButtonColor() : Colors.grey)
-                  .withOpacity(0.3),
+              color: (isEnabled ? _fixedColor : Colors.grey).withOpacity(0.3),
               blurRadius: 8,
               offset: Offset(0, 2),
             ),
@@ -183,11 +187,11 @@ class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
       height: 48,
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: _getStatusColor(),
+        color: _fixedColor, // لون ثابت للخلفية
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: _getStatusColor().withOpacity(0.3),
+            color: _fixedColor.withOpacity(0.3),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -208,7 +212,7 @@ class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
                   shape: BoxShape.circle,
                 ),
               ),
-              SizedBox(width: 6),
+              SizedBox(width: 4),
               Text(
                 _getConnectionStatusText(),
                 style: TextStyle(
@@ -245,22 +249,6 @@ class _CustomTopSnackBarState extends State<CustomTopSnackBar> {
         ],
       ),
     );
-  }
-
-  Color _getStatusColor() {
-    if (!widget.isConnected) return Colors.grey[600]!;
-    if (widget.isInRedZone) return Colors.red[700]!;
-    if (widget.isOutsideSafeZone) return Colors.orange[700]!;
-    if (widget.isStationary) return Colors.amber[700]!;
-    return Color(0xff243561);
-  }
-
-  Color _getButtonColor() {
-    if (!widget.isConnected) return Colors.grey[600]!;
-    if (widget.isInRedZone) return Colors.red[700]!;
-    if (widget.isOutsideSafeZone) return Colors.orange[700]!;
-    if (widget.isStationary) return Colors.amber[700]!;
-    return Color(0xff243561);
   }
 
   Color _getConnectionDotColor() {

@@ -7,7 +7,7 @@ import 'package:tracelet_app/auth_screens/Log_In_Screen.dart';
 import 'package:tracelet_app/constans/constans.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/ProfilePictureWidget.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/account_screen.dart';
-import 'package:tracelet_app/landing_screens/screens/profile_screens/SafeZoneScreen_screen.dart';
+import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/ZoneScreen_screen.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/notifications_screen.dart';
 import 'package:tracelet_app/widgets/bg_widgets/bg_landing_widget.dart';
 

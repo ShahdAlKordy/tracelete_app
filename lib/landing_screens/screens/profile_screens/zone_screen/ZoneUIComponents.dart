@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tracelet_app/landing_screens/screens/profile_screens/SafeZoneScreen_screen.dart';
+import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/ZoneScreen_screen.dart';
 import 'package:tracelet_app/landing_screens/screens/profile_screens/zone_screen/ZoneData.dart';
 // Remove the old import and use the BraceletModel from ZoneData.dart instead
 
